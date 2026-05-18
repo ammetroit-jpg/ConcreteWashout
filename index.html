@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ผลสำรวจขอบบ่อคาย Metro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400;1,9..144,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+  h1 {
+      white-space: nowrap !important;
+  }
+  :root {
+    --bg: #0a0e14;
+    --bg-1: #0f141c;
+    --bg-2: #161c26;
+    --bg-3: #1d2532;
+    --line: #2a3340;
+    --line-soft: #1f2733;
+    --ink: #e8ecf2;
+    --ink-soft: #a8b0bd;
+    --ink-mute: #6b7585;
+    --ink-faint: #4a5263;
+
+    --accent: #ff6b4a;
+    --accent-2: #ffd166;
+    --done: #4ade80;
+    --done-bg: rgba(74, 222, 128, 0.12);
+    --pending: #ff6b4a;
+    --pending-bg: rgba(255, 107, 74, 0.13);
+    --safe: #7aa7ff;
+    --safe-bg: rgba(122, 167, 255, 0.13);
+    --progress: #ffd166;
+    --progress-bg: rgba(255, 209, 102, 0.13);
+
+    --glow-soft: 0 1px 0 rgba(255,255,255,0.04) inset, 0 12px 32px -16px rgba(0,0,0,0.6);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-weight: 400;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(900px circle at 8% -10%, rgba(255,107,74,0.10), transparent 50%),
+      radial-gradient(900px circle at 100% 0%, rgba(122,167,255,0.08), transparent 50%),
+      radial-gradient(700px circle at 50% 110%, rgba(74,222,128,0.05), transparent 50%),
+      var(--bg);
+    background-attachment: fixed;
+    position: relative;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 56px 56px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    opacity: 0.04;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 44px 32px 80px;
+  }
+
+  /* ─── Masthead ─────────────── */
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 24px;
+    flex-wrap: wrap;
+    padding: 12px 20px;
+    margin-bottom: 36px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(20, 26, 36, 0.6);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+  .masthead .brand {
+    display: flex; align-items: center; gap: 10px;
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-style: italic;
+    font-size: 15px;
+  }
+  .masthead .brand .pulse {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 0 4px rgba(255,107,74,0.15), 0 0 12px rgba(255,107,74,0.6);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.6; transform: scale(1.15); }
+  }
+  .masthead .right {
+    display: flex; align-items: center; gap: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+  }
+  .refresh-btn {
+    border: 1px solid var(--line);
+    background: var(--bg-3);
+    color: var(--ink-soft);
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all .18s;
+  }
+  .refresh-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .refresh-btn:disabled { opacity: 0.5; cursor: wait; }
+  .refresh-btn .spin {
+    display: inline-block;
+    transition: transform .3s;
+  }
+  .refresh-btn.loading .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Hero ─────────────── */
+  .hero {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 48px;
+    align-items: end;
+    padding-bottom: 40px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 44px;
+  }
+  .hero h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: clamp(40px, 5.5vw, 78px);
+    line-height: 0.98;
+    letter-spacing: -0.025em;
+  }
+  .hero h1 .serif-italic {
+    font-style: italic;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero .lede {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--ink-soft);
+    border-left: 2px solid var(--accent);
+    padding-left: 18px;
+  }
+  .hero .lede strong { color: var(--ink); font-weight: 600; }
+
+  .deck {
+    display: flex;
+    gap: 22px;
+    margin-bottom: 48px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    flex-wrap: wrap;
+  }
+  .deck span { display: inline-flex; align-items: center; gap: 8px; }
+  .deck .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* ─── KPI ─────────────── */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 56px;
+  }
+  .kpi {
+    position: relative;
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 22px 22px 20px;
+    overflow: hidden;
+    transition: transform .25s cubic-bezier(.2,.7,.2,1), border-color .25s, box-shadow .25s;
+  }
+  .kpi::before {
+    content: "";
+    position: absolute;
+    top: -1px; left: -1px; right: -1px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--clr, var(--ink-faint)), transparent);
+    opacity: 0.7;
+  }
+  .kpi:hover {
+    transform: translateY(-3px);
+    border-color: var(--clr, var(--ink-soft));
+    box-shadow: 0 16px 40px -16px rgba(0,0,0,0.5);
+  }
+  .kpi .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .kpi .label .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--clr, var(--ink-soft));
+    box-shadow: 0 0 8px var(--clr, transparent);
+  }
+  .kpi .num {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 54px;
+    line-height: 1;
+    letter-spacing: -0.025em;
+    color: var(--clr, var(--ink));
+  }
+  .kpi .unit {
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    font-weight: 400;
+    font-size: 14px;
+    color: var(--ink-mute);
+    margin-left: 6px;
+  }
+  .kpi .pct {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+  .kpi .bar {
+    margin-top: 12px;
+    height: 3px;
+    background: var(--bg-3);
+    overflow: hidden;
+    border-radius: 999px;
+  }
+  .kpi .bar > i {
+    display: block; height: 100%;
+    width: 0;
+    background: var(--clr, var(--ink-soft));
+    box-shadow: 0 0 12px var(--clr, transparent);
+    transition: width 1.4s cubic-bezier(.2,.7,.2,1);
+    border-radius: 999px;
+  }
+  .kpi.total    { --clr: var(--ink); }
+  .kpi.done     { --clr: var(--done); }
+  .kpi.pending  { --clr: var(--pending); }
+  .kpi.safe     { --clr: var(--safe); }
+
+  /* ─── Section ─────────────── */
+  .sec-head {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin: 8px 0 22px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .sec-head h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 600;
+    font-size: 24px;
+    letter-spacing: -0.015em;
+  }
+  .sec-head .marker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  .sec-head .note {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-mute);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  /* ─── Charts ─────────────── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 60px;
+  }
+  .card {
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 26px 28px;
+    box-shadow: var(--glow-soft);
+  }
+  .card .card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 19px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .card .card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  .chart-wrap { position: relative; height: 280px; }
+
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px dashed var(--line);
+  }
+  .legend-row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--ink-soft);
+  }
+  .legend-row .sw {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    box-shadow: 0 0 8px currentColor;
+  }
+  .legend-row .name { font-weight: 500; color: var(--ink); }
+  .legend-row .v {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-mute);
+  }
+  .legend-row .p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    font-weight: 700;
+    min-width: 48px;
+    text-align: right;
+  }
+
+  /* ─── Table ─────────────── */
+  .table-wrap {
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    margin-bottom: 48px;
+    overflow: hidden;
+    box-shadow: var(--glow-soft);
+  }
+  .table-toolbar {
+    display: flex;
+    gap: 8px;
+    padding: 18px 22px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .table-toolbar .lbl {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    margin-right: 6px;
+  }
+  .chip {
+    border: 1px solid var(--line);
+    background: var(--bg-3);
+    color: var(--ink-soft);
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-family: 'IBM Plex Sans Thai', sans-serif;
+    cursor: pointer;
+    transition: all .18s ease;
+    border-radius: 999px;
+    user-select: none;
+  }
+  .chip:hover { border-color: var(--ink-mute); color: var(--ink); }
+  .chip.active {
+    background: var(--ink);
+    color: var(--bg);
+    border-color: var(--ink);
+  }
+  .chip .count {
+    font-family: 'JetBrains Mono', monospace;
+    margin-left: 6px;
+    opacity: 0.7;
+    font-size: 11px;
+  }
+  .search {
+    margin-left: auto;
+    border: 1px solid var(--line);
+    background: var(--bg-3);
+    color: var(--ink);
+    padding: 7px 14px;
+    font-size: 12.5px;
+    font-family: inherit;
+    border-radius: 999px;
+    min-width: 180px;
+    outline: none;
+    transition: border-color .18s, box-shadow .18s;
+  }
+  .search::placeholder { color: var(--ink-faint); }
+  .search:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(255,107,74,0.12);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+  }
+  thead th {
+    text-align: left;
+    padding: 13px 22px;
+    background: var(--bg-3);
+    border-bottom: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+    font-weight: 600;
+  }
+  thead th:first-child { width: 56px; text-align: right; }
+  tbody td {
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: middle;
+    color: var(--ink);
+  }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover { background: rgba(255,255,255,0.025); }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody td:first-child {
+    text-align: right;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+  tbody td.factory { font-weight: 500; }
+  tbody td.phone {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
+  tbody td.reason { color: var(--ink-soft); font-size: 12.5px; }
+
+  .badge {
+    display: inline-block;
+    padding: 4px 11px;
+    font-size: 11.5px;
+    font-weight: 500;
+    border-radius: 999px;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .badge.done { background: var(--done-bg); color: var(--done); border-color: rgba(74,222,128,0.25); }
+  .badge.pending { background: var(--pending-bg); color: var(--pending); border-color: rgba(255,107,74,0.3); }
+  .badge.safe { background: var(--safe-bg); color: var(--safe); border-color: rgba(122,167,255,0.25); }
+  .badge.progress { background: var(--progress-bg); color: var(--progress); border-color: rgba(255,209,102,0.25); }
+  .badge.unknown { background: rgba(255,255,255,0.05); color: var(--ink-mute); border-color: var(--line); }
+
+  .empty-row td {
+    text-align: center;
+    padding: 32px;
+    color: var(--ink-mute);
+    font-style: italic;
+  }
+
+  /* ─── Watchlist ─────────────── */
+  .watchlist { margin-bottom: 56px; }
+  .watch-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 10px;
+  }
+  .watch-item {
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--pending);
+    border-radius: 10px;
+    padding: 13px 15px;
+    font-size: 13.5px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .watch-item::after {
+    content: "";
+    position: absolute;
+    right: -20px; top: -20px;
+    width: 60px; height: 60px;
+    background: radial-gradient(circle, rgba(255,107,74,0.18), transparent 70%);
+    opacity: 0;
+    transition: opacity .25s;
+  }
+  .watch-item:hover {
+    transform: translateY(-2px);
+    border-left-color: var(--accent-2);
+    box-shadow: 0 8px 24px -12px rgba(0,0,0,0.6);
+  }
+  .watch-item:hover::after { opacity: 1; }
+  .watch-item .nm { font-weight: 600; color: var(--ink); }
+  .watch-item .ph {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-mute);
+  }
+  .watch-empty {
+    color: var(--ink-mute);
+    font-style: italic;
+    padding: 18px 22px;
+    background: var(--bg-2);
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  /* ─── Loading / Error states ─────────────── */
+  .state-overlay {
+    background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 60px 32px;
+    text-align: center;
+    margin-bottom: 56px;
+  }
+  .state-overlay .icon {
+    font-size: 40px;
+    margin-bottom: 18px;
+    display: inline-block;
+  }
+  .state-overlay .icon.loading {
+    animation: spin 1.4s linear infinite;
+  }
+  .state-overlay h3 {
+    font-family: 'Fraunces', serif;
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .state-overlay p {
+    color: var(--ink-soft);
+    font-size: 14px;
+    max-width: 540px;
+    margin: 0 auto 6px;
+  }
+  .state-overlay code {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 6px 12px;
+    background: var(--bg-3);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+    word-break: break-all;
+    max-width: 100%;
+  }
+
+  .hidden { display: none !important; }
+
+  /* ─── Footer ─────────────── */
+  footer {
+    margin-top: 60px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+
+  /* ─── Responsive ─────────────── */
+  @media (max-width: 960px) {
+    .wrap { padding: 28px 18px 60px; }
+    .hero { grid-template-columns: 1fr; gap: 22px; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    tbody td.phone, thead th.phone-col { display: none; }
+    tbody td.reason, thead th.reason-col { display: none; }
+  }
+  @media (max-width: 520px) {
+    .kpis { gap: 10px; }
+    .kpi { padding: 18px; }
+    .kpi .num { font-size: 40px; }
+    .hero h1 { font-size: 38px; }
+    .search { width: 100%; margin-left: 0; }
+    .masthead .right { width: 100%; justify-content: space-between; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─── Masthead ─────────────── -->
+  <div class="masthead">
+    <div class="brand"><span class="pulse"></span> Metro Field Survey ✦ Operations Intelligence</div>
+    <div class="right">
+      <span id="lastUpdate">—</span>
+      <button class="refresh-btn" id="refreshBtn" title="ดึงข้อมูลใหม่จาก Google Sheets">
+        <span class="spin">↻</span> Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- ─── Hero ─────────────── -->
+  <section class="hero">
+    <h1>ผลสำรวจ<span class="serif-italic">ขอบบ่อคาย</span><br>Metro</h1>
+    <p class="lede">
+      รายงานสรุปสถานะการดำเนินการของเครือข่ายโรงงาน Metro
+      ครอบคลุมการตรวจขอบบ่อคาย พร้อมแยกตามสถานะ
+      <strong>ดำเนินการแล้ว, ยังไม่ดำเนินการ, ไม่อยู่ในกลุ่มเสี่ยง</strong>
+      และอยู่ระหว่างดำเนินการ — ข้อมูลซิงค์สดจาก Google Sheets
+    </p>
+  </section>
+
+  <div class="deck">
+    <span><i class="dot"></i> Live Sync · Google Sheets</span>
+    <span><i class="dot"></i> Source · ทีมสำรวจภาคสนาม</span>
+    <span id="deckRecords"><i class="dot"></i> Records · —</span>
+    <span><i class="dot"></i> Coverage · กรุงเทพฯ และปริมณฑล</span>
+  </div>
+
+  <!-- ─── Loading state ─────────────── -->
+  <div class="state-overlay" id="loadingState">
+    <div class="icon loading">↻</div>
+    <h3>กำลังโหลดข้อมูลจาก Google Sheets…</h3>
+    <p>กรุณารอสักครู่</p>
+  </div>
+
+  <!-- ─── Error state ─────────────── -->
+  <div class="state-overlay hidden" id="errorState">
+    <div class="icon">⚠</div>
+    <h3>ไม่สามารถโหลดข้อมูลได้</h3>
+    <p id="errorMsg">โปรดตรวจสอบว่า Google Sheet ถูก Publish to web เป็น CSV แล้ว และ URL ใน <code>SHEET_CSV_URL</code> ถูกต้อง</p>
+    <button class="refresh-btn" onclick="loadData()" style="margin-top:18px;">
+      <span class="spin">↻</span> ลองใหม่อีกครั้ง
+    </button>
+  </div>
+
+  <!-- ─── Main content ─────────────── -->
+  <div id="mainContent" class="hidden">
+
+    <section class="kpis">
+      <div class="kpi total">
+        <div class="label"><i class="dot"></i> โรงงานทั้งหมด</div>
+        <div class="num" id="kpiTotal">—<span class="unit">แห่ง</span></div>
+        <div class="pct">100% ของรายการสำรวจ</div>
+        <div class="bar"><i data-w="100"></i></div>
+      </div>
+      <div class="kpi done">
+        <div class="label"><i class="dot"></i> ดำเนินการแล้ว</div>
+        <div class="num" id="kpiDone">—<span class="unit">แห่ง</span></div>
+        <div class="pct" id="pctDone">—</div>
+        <div class="bar"><i id="barDone" data-w="0"></i></div>
+      </div>
+      <div class="kpi pending">
+        <div class="label"><i class="dot"></i> ยังไม่ดำเนินการ</div>
+        <div class="num" id="kpiPending">—<span class="unit">แห่ง</span></div>
+        <div class="pct" id="pctPending">—</div>
+        <div class="bar"><i id="barPending" data-w="0"></i></div>
+      </div>
+      <div class="kpi safe">
+        <div class="label"><i class="dot"></i> ไม่อยู่ในกลุ่มเสี่ยง</div>
+        <div class="num" id="kpiSafe">—<span class="unit">แห่ง</span></div>
+        <div class="pct" id="pctSafe">—</div>
+        <div class="bar"><i id="barSafe" data-w="0"></i></div>
+      </div>
+    </section>
+
+    <div class="sec-head">
+      <span class="marker">§ 01</span>
+      <h2>ภาพรวมสถานะ</h2>
+      <span class="note">Status Distribution</span>
+    </div>
+
+    <section class="grid-2">
+      <div class="card">
+        <div class="card-title">สัดส่วนสถานะการดำเนินการ</div>
+        <div class="card-sub">Donut · % of total</div>
+        <div class="chart-wrap"><canvas id="donut"></canvas></div>
+        <div class="legend" id="donutLegend"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">เปรียบเทียบจำนวน (แท่ง)</div>
+        <div class="card-sub">Horizontal bar · count</div>
+        <div class="chart-wrap"><canvas id="bar"></canvas></div>
+        <div class="legend">
+          <div class="legend-row">
+            <span></span>
+            <span class="name" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute);font-weight:400;">Completion rate</span>
+            <span class="v"></span>
+            <span class="p" id="metricCompletion" style="color:var(--done)">—</span>
+          </div>
+          <div class="legend-row">
+            <span></span>
+            <span class="name" style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-mute);font-weight:400;">Risk gap (pending)</span>
+            <span class="v"></span>
+            <span class="p" id="metricRisk" style="color:var(--pending)">—</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="sec-head">
+      <span class="marker">§ 02</span>
+      <h2>รายชื่อโรงงานที่ต้องติดตาม</h2>
+      <span class="note" id="watchNote">Priority Watchlist · — sites</span>
+    </div>
+
+    <section class="watchlist">
+      <div class="watch-grid" id="watchGrid"></div>
+    </section>
+
+    <div class="sec-head">
+      <span class="marker">§ 03</span>
+      <h2>ตารางสรุปทุกโรงงาน</h2>
+      <span class="note">Searchable · Filterable</span>
+    </div>
+
+    <section class="table-wrap">
+      <div class="table-toolbar" id="filterBar">
+        <span class="lbl">Filter</span>
+        <!-- chips จะถูกสร้างขึ้นจาก JS -->
+        <input class="search" id="searchInput" type="search" placeholder="ค้นหาชื่อโรงงาน...">
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>สังกัดโรงงาน</th>
+            <th>สถานะ</th>
+            <th class="phone-col">เบอร์ติดต่อ</th>
+            <th class="reason-col">เหตุผล</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </section>
+
+  </div>
+
+  <footer>
+    <span>© 2569 · Metro Operations</span>
+    <span>ผลสำรวจขอบบ่อคาย</span>
+    <span>Dashboard v2.0 · Live</span>
+  </footer>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+ * ⚙️  CONFIGURATION  —  แก้ตรงนี้เท่านั้น
+ * ═══════════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  // 🔗 เราต้องใช้ /pub? แล้วตามด้วย output=csv เสมอนะครับ 
+  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vSBcwLgbJH-U6ktYlRMQCgaCGW-Iow36l88jsEFF9IJ1CL2Rs5f4VEVkerJl-lTZ9Jfh9oRvsdTHJiG/pub?gid=0&single=true&output=csv",
+
+  // 👉 เติมตะกร้าเปล่าๆ ไว้ตรงนี้ ลูกน้อง (map) จะได้ไม่ตกใจ
+  EXCLUDE_FACTORIES: [],
+
+  // 🗂  ชื่อคอลัมน์ใน Google Sheet (ต้องพิมพ์ให้ตรงกับหัวตารางในชีทเป๊ะๆ)
+  COLUMNS: {
+    factory: "สังกัดโรงงาน",
+    phone:   "เบอร์โทรศัพท์ติดต่อ",
+    status:  "สถานะ",
+    reason:  "เหตุผล"
+  }
+};
+
+/* ═══════════════════════════════════════════════════════════════════════ */
+
+// สีและ class สำหรับแต่ละสถานะ
+const STATUS_META = {
+  "ดำเนินการแล้ว":      { cls: "done",     color: "#4ade80", label: "ดำเนินการแล้ว" },
+  "ยังไม่ดำเนินการ":    { cls: "pending",  color: "#ff6b4a", label: "ยังไม่ดำเนินการ" },
+  "ไม่อยู่ในกลุ่มเสี่ยง": { cls: "safe",     color: "#7aa7ff", label: "ไม่อยู่ในกลุ่มเสี่ยง" },
+  "อยู่ระหว่าดำเนินการ": { cls: "progress", color: "#ffd166", label: "อยู่ระหว่างดำเนินการ" },
+  "อยู่ระหว่างดำเนินการ":{ cls: "progress", color: "#ffd166", label: "อยู่ระหว่างดำเนินการ" },
+  "":                  { cls: "unknown",  color: "#6b7585", label: "ยังไม่ระบุ" }
+};
+
+// ลำดับการแสดงสถานะ (จะถูกกรองตามสถานะที่มีจริงในข้อมูล)
+const STATUS_ORDER = [
+  "ดำเนินการแล้ว",
+  "ยังไม่ดำเนินการ",
+  "ไม่อยู่ในกลุ่มเสี่ยง",
+  "อยู่ระหว่าดำเนินการ",
+  "อยู่ระหว่างดำเนินการ",
+  ""
+];
+
+let DATA = [];
+let donutChart = null;
+let barChart = null;
+
+// ────────────────────────────────────────
+// Chart.js dark theme defaults
+// ────────────────────────────────────────
+Chart.defaults.color = "#a8b0bd";
+Chart.defaults.font.family = "'IBM Plex Sans Thai', sans-serif";
+
+// ────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────
+function getStatusMeta(s) {
+  const key = (s || "").trim();
+  return STATUS_META[key] || STATUS_META[""];
+}
+
+function pct(v, total) {
+  if (!total) return "0.0";
+  return ((v / total) * 100).toFixed(1);
+}
+
+function formatLastUpdate() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  return `Updated ${pad(d.getHours())}:${pad(d.getMinutes())} · ${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear() + 543}`;
+}
+
+// ────────────────────────────────────────
+// Fetch & parse CSV
+// ────────────────────────────────────────
+async function fetchSheet() {
+  const url = CONFIG.SHEET_CSV_URL;
+  if (!url || url.includes("PASTE_YOUR")) {
+    throw new Error("ยังไม่ได้กำหนด SHEET_CSV_URL กรุณาแก้ไฟล์และวาง URL จาก Google Sheets (Publish to web → CSV)");
+  }
+  // cache-buster เพื่อให้ได้ข้อมูลใหม่เสมอ
+  const bust = url.includes("?") ? `&_t=${Date.now()}` : `?_t=${Date.now()}`;
+  const res = await fetch(url + bust, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status} — ไม่สามารถดึงข้อมูลจาก Google Sheets ได้`);
+  const text = await res.text();
+
+  const parsed = Papa.parse(text, {
+    header: true,
+    skipEmptyLines: true,
+    transformHeader: (h) => h.trim()
+  });
+  if (parsed.errors && parsed.errors.length) {
+    console.warn("CSV parse warnings:", parsed.errors);
+  }
+
+  const C = CONFIG.COLUMNS;
+  const exclude = new Set(CONFIG.EXCLUDE_FACTORIES.map(x => x.trim()));
+
+  return parsed.data
+    .map(row => ({
+      f: (row[C.factory] || "").trim(),
+      p: (row[C.phone]   || "").trim(),
+      s: (row[C.status]  || "").trim(),
+      r: (row[C.reason]  || "").trim()
+    }))
+    .filter(d => d.f && !exclude.has(d.f));
+}
+
+// ────────────────────────────────────────
+// Render
+// ────────────────────────────────────────
+function renderAll(data) {
+  DATA = data;
+  const total = DATA.length;
+
+  // นับตามสถานะ
+  const counts = {};
+  DATA.forEach(d => {
+    const key = d.s.trim();
+    counts[key] = (counts[key] || 0) + 1;
+  });
+
+  // หา list สถานะที่มีในข้อมูล (เรียงตาม STATUS_ORDER + อะไรที่ไม่อยู่ใน order)
+  const seen = new Set(Object.keys(counts));
+  const orderedStatuses = STATUS_ORDER.filter(s => seen.has(s));
+  Array.from(seen).forEach(s => {
+    if (!orderedStatuses.includes(s)) orderedStatuses.push(s);
+  });
+
+  // อัปเดต KPI
+  document.getElementById("kpiTotal").innerHTML = `${total}<span class="unit">แห่ง</span>`;
+  const done    = counts["ดำเนินการแล้ว"]      || 0;
+  const pending = counts["ยังไม่ดำเนินการ"]    || 0;
+  const safe    = counts["ไม่อยู่ในกลุ่มเสี่ยง"] || 0;
+  document.getElementById("kpiDone").innerHTML    = `${done}<span class="unit">แห่ง</span>`;
+  document.getElementById("kpiPending").innerHTML = `${pending}<span class="unit">แห่ง</span>`;
+  document.getElementById("kpiSafe").innerHTML    = `${safe}<span class="unit">แห่ง</span>`;
+  document.getElementById("pctDone").textContent    = `${pct(done, total)}% — เสร็จสมบูรณ์`;
+  document.getElementById("pctPending").textContent = `${pct(pending, total)}% — ต้องติดตาม`;
+  document.getElementById("pctSafe").textContent    = `${pct(safe, total)}% — มีการบริหารจัดการ`;
+
+  // bars
+  const setBar = (id, v) => {
+    const el = document.getElementById(id);
+    el.dataset.w = v;
+    requestAnimationFrame(() => { el.style.width = v + "%"; });
+  };
+  setBar("barDone",    pct(done, total));
+  setBar("barPending", pct(pending, total));
+  setBar("barSafe",    pct(safe, total));
+
+  // metrics
+  document.getElementById("metricCompletion").textContent = `${pct(done, total)}%`;
+  document.getElementById("metricRisk").textContent       = `${pct(pending, total)}%`;
+  document.getElementById("deckRecords").innerHTML        = `<i class="dot"></i> Records · ${total} รายการ`;
+
+  // ─── Charts ───
+  const labels = orderedStatuses.map(s => getStatusMeta(s).label);
+  const values = orderedStatuses.map(s => counts[s] || 0);
+  const colors = orderedStatuses.map(s => getStatusMeta(s).color);
+
+  if (donutChart) donutChart.destroy();
+  if (barChart) barChart.destroy();
+
+  donutChart = new Chart(document.getElementById("donut").getContext("2d"), {
+    type: "doughnut",
+    data: { labels, datasets: [{
+      data: values,
+      backgroundColor: colors,
+      borderColor: "#0f141c",
+      borderWidth: 3,
+      hoverOffset: 10,
+      hoverBorderColor: "#161c26"
+    }]},
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "66%",
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1d2532",
+          borderColor: "#2a3340",
+          borderWidth: 1,
+          titleColor: "#e8ecf2",
+          bodyColor: "#a8b0bd",
+          titleFont: { family: "'IBM Plex Sans Thai', sans-serif", size: 13 },
+          bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+          padding: 12,
+          cornerRadius: 8,
+          callbacks: { label: (ctx) => ` ${ctx.parsed} แห่ง · ${pct(ctx.parsed, total)}%` }
+        }
+      },
+      animation: { animateRotate: true, duration: 1000, easing: "easeOutQuart" }
+    }
+  });
+
+  // donut legend
+  const dl = document.getElementById("donutLegend");
+  dl.innerHTML = "";
+  orderedStatuses.forEach((s, i) => {
+    const v = values[i];
+    const row = document.createElement("div");
+    row.className = "legend-row";
+    row.innerHTML = `
+      <span class="sw" style="background:${colors[i]};color:${colors[i]}"></span>
+      <span class="name">${labels[i]}</span>
+      <span class="v">${v} แห่ง</span>
+      <span class="p">${pct(v, total)}%</span>
+    `;
+    dl.appendChild(row);
+  });
+
+  barChart = new Chart(document.getElementById("bar").getContext("2d"), {
+    type: "bar",
+    data: { labels, datasets: [{
+      data: values,
+      backgroundColor: colors,
+      borderRadius: 4,
+      borderSkipped: false,
+      barThickness: 22
+    }]},
+    options: {
+      indexAxis: "y",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: "#1d2532",
+          borderColor: "#2a3340",
+          borderWidth: 1,
+          titleColor: "#e8ecf2",
+          bodyColor: "#a8b0bd",
+          padding: 12,
+          cornerRadius: 8,
+          titleFont: { family: "'IBM Plex Sans Thai', sans-serif", size: 13 },
+          bodyFont: { family: "'JetBrains Mono', monospace", size: 12 },
+          callbacks: { label: (ctx) => ` ${ctx.parsed.x} แห่ง` }
+        }
+      },
+      scales: {
+        x: { beginAtZero: true,
+             grid: { color: "rgba(255,255,255,0.05)", drawBorder: false },
+             ticks: { font: { family: "'JetBrains Mono', monospace", size: 10 }, color: "#6b7585" } },
+        y: { grid: { display: false, drawBorder: false },
+             ticks: { font: { family: "'IBM Plex Sans Thai', sans-serif", size: 12 }, color: "#e8ecf2" } }
+      },
+      animation: { duration: 1000, easing: "easeOutQuart" }
+    }
+  });
+
+  // ─── Watchlist (ยังไม่ดำเนินการ) ───
+  const wg = document.getElementById("watchGrid");
+  wg.innerHTML = "";
+  const watch = DATA.filter(d => d.s === "ยังไม่ดำเนินการ");
+  document.getElementById("watchNote").textContent = `Priority Watchlist · ${watch.length} sites`;
+  if (watch.length === 0) {
+    wg.innerHTML = `<div class="watch-empty">— ไม่มีโรงงานที่ต้องติดตามในขณะนี้ 🎉 —</div>`;
+  } else {
+    watch.forEach(d => {
+      const div = document.createElement("div");
+      div.className = "watch-item";
+      div.innerHTML = `<span class="nm">${d.f}</span><span class="ph">${d.p || "—"}</span>`;
+      wg.appendChild(div);
+    });
+  }
+
+  // ─── Filter chips ───
+  const filterBar = document.getElementById("filterBar");
+  // ลบ chips เก่า (เก็บ label และ search ไว้)
+  filterBar.querySelectorAll(".chip").forEach(c => c.remove());
+  const searchEl = document.getElementById("searchInput");
+
+  const allChip = document.createElement("div");
+  allChip.className = "chip active";
+  allChip.dataset.filter = "all";
+  allChip.innerHTML = `ทั้งหมด <span class="count">${total}</span>`;
+  filterBar.insertBefore(allChip, searchEl);
+
+  orderedStatuses.forEach(s => {
+    const meta = getStatusMeta(s);
+    const chip = document.createElement("div");
+    chip.className = "chip";
+    chip.dataset.filter = s;
+    chip.innerHTML = `${meta.label} <span class="count">${counts[s]}</span>`;
+    filterBar.insertBefore(chip, searchEl);
+  });
+
+  filterBar.querySelectorAll(".chip").forEach(c => {
+    c.addEventListener("click", () => {
+      filterBar.querySelectorAll(".chip").forEach(x => x.classList.remove("active"));
+      c.classList.add("active");
+      renderTable(c.dataset.filter, searchEl.value);
+    });
+  });
+
+  renderTable("all", searchEl.value || "");
+  document.getElementById("lastUpdate").textContent = formatLastUpdate();
+}
+
+function statusBadge(s) {
+  const m = getStatusMeta(s);
+  return `<span class="badge ${m.cls}">${m.label}</span>`;
+}
+
+function renderTable(filter = "all", q = "") {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  const ql = q.trim().toLowerCase();
+  const rows = DATA.filter(d => {
+    if (filter !== "all" && d.s !== filter) return false;
+    if (ql && !d.f.toLowerCase().includes(ql)) return false;
+    return true;
+  });
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">— ไม่พบข้อมูลที่ตรงกัน —</td></tr>`;
+    return;
+  }
+  rows.forEach((d, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${String(i + 1).padStart(2, "0")}</td>
+      <td class="factory">${d.f}</td>
+      <td>${statusBadge(d.s)}</td>
+      <td class="phone phone-col">${d.p || "—"}</td>
+      <td class="reason reason-col">${d.r || "—"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ────────────────────────────────────────
+// Search input listener (one-time)
+// ────────────────────────────────────────
+document.getElementById("searchInput").addEventListener("input", () => {
+  const active = document.querySelector("#filterBar .chip.active");
+  renderTable(active ? active.dataset.filter : "all", document.getElementById("searchInput").value);
+});
+
+// ────────────────────────────────────────
+// Refresh button
+// ────────────────────────────────────────
+const refreshBtn = document.getElementById("refreshBtn");
+refreshBtn.addEventListener("click", () => loadData(true));
+
+// ────────────────────────────────────────
+// Main loader
+// ────────────────────────────────────────
+async function loadData(isRefresh = false) {
+  const loadingEl = document.getElementById("loadingState");
+  const errorEl   = document.getElementById("errorState");
+  const mainEl    = document.getElementById("mainContent");
+
+  if (isRefresh) {
+    refreshBtn.classList.add("loading");
+    refreshBtn.disabled = true;
+  } else {
+    loadingEl.classList.remove("hidden");
+    errorEl.classList.add("hidden");
+    mainEl.classList.add("hidden");
+  }
+
+  try {
+    const data = await fetchSheet();
+    renderAll(data);
+    loadingEl.classList.add("hidden");
+    errorEl.classList.add("hidden");
+    mainEl.classList.remove("hidden");
+  } catch (err) {
+    console.error(err);
+    document.getElementById("errorMsg").innerHTML =
+      `${err.message}<br><br>โปรดตรวจสอบว่า Google Sheet ถูก <strong>Publish to web</strong> เป็น CSV แล้ว และวาง URL ลงในตัวแปร <code>SHEET_CSV_URL</code> ของไฟล์ HTML`;
+    loadingEl.classList.add("hidden");
+    mainEl.classList.add("hidden");
+    errorEl.classList.remove("hidden");
+  } finally {
+    refreshBtn.classList.remove("loading");
+    refreshBtn.disabled = false;
+  }
+}
+
+// 🚀 เริ่มโหลดข้อมูลทันทีเมื่อเปิดหน้า
+loadData();
+</script>
+</body>
+</html>
